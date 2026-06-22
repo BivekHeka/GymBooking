@@ -8,13 +8,12 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.common.exceptions import TimeoutException
 
 # 1. Credentials & Configuration
-# TIP: You can also use the default built-in account: "student@test.com" / "password123"
 ACCOUNT_EMAIL = "vek@test.com"
 ACCOUNT_PASSWORD = "Testw0rd"
 GYM_URL = "https://appbrewery.github.io/gym/"
 
 # 2. Automated Lock Cleaner
-user_data_dir = os.path.join(os.getcwd(), "chrome_profile")
+user_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chrome_profile")
 lock_file = os.path.join(user_data_dir, "SingletonLock")
 if os.path.exists(lock_file):
     try:
@@ -76,43 +75,60 @@ except TimeoutException:
 
 print("\nReady for gym booking automation tasks!")
 
-# Create a try/except block so if the class isn't on the schedule, the script handles it gracefully
+# Smart gym booking automatiion
 try:
     # Line 1: Let yourself know in the terminal that the script has moved onto Step 3
     print("\nScanning schedule for upcoming Tuesday at 6:00 PM...")
 
-    # Line 2: Define a unique XPath map that isolates the container holding BOTH "Tue" and "6:00 PM", then targets the button inside it
-    # Line 2 (FIXED): Finds the 'Tue' header element first, jumps to its class column container, and isolates the 6:00 PM button
+
     # Line 2 (ULTRA-ROBUST): Finds the Tuesday header by its ID, looks forward for the next 6:00 PM card, and targets its button
     target_xpath = "//h2[contains(@id, 'tue')]/following::div[contains(., '6:00 PM') or contains(., '6:00pm')][1]//button"
 
-    # Line 3: Tell Selenium to wait patiently (up to 10 seconds) until that specific target button becomes clickable on the screen
-    booking_btn = wait.until(ec.element_to_be_clickable((By.XPATH, target_xpath)))
+    #3 Wait until the target button is visible on the screen
+    booking_btn = wait.until(ec.visibility_of_element_located((By.XPATH, target_xpath)))
 
-    # Line 4: Grab the entire card block text (excluding the button) so we can figure out what type of workout it is
-    # Line 4 (FIXED): Selects the specific class card container inside the Tuesday group to extract its readable title text
+    #4 Capture the clean text on the button to check its status
+    button_text = booking_btn.text.strip()
+    print(f"Current button state detected: '{button_text}'")
+
     # Line 4 (ULTRA-ROBUST): Looks forward from the Tuesday header to get the text of that exact 6:00 PM class wrapper block
-    card_element = driver.find_element(By.XPATH, "//h2[contains(@id, 'tue')]/following::div[contains(., '6:00 PM') or contains(., '6:00pm')][1]")
+    card_element = booking_btn.find_element(By.XPATH, "./ancestor::div[1]")
     card_text = card_element.text
 
-    # Line 5: Initialize a default fallback string name for the workout type
+    #5 Identify workout type
     workout_type = "Class"
-
-    # Line 6: Check if the word "Spin" lives anywhere inside the card's readable text layout
     if "Spin" in card_text:
         workout_type = "Spin Class"
-    # Line 7: Check if the word "Yoga" lives inside it instead
     elif "Yoga" in card_text:
         workout_type = "Yoga Class"
-    # Line 8: Check if the word "HIIT" lives inside it instead
     elif "HIIT" in card_text:
         workout_type = "HIIT Class"
 
-    # Line 9: Command the browser automation to click the targeted "Book Class" or "Join Waitlist" button
-    booking_btn.click()
 
-    # Line 10: Output your custom success message directly to the VS Code panel using the string formatting we calculated
-    print(f"\n✓ Booked: {workout_type} on Tue at 6:00 PM 📅 🤗")
+    #-----SMART DECISION ENGINE--------
+
+    # Condition A: Already Booked
+    if button_text == "Booked":
+        print(f"\nℹ️ Skip: You have already booked this {workout_type}! No action taken. 😎")
+
+    # Condition B: Already on Waitlist
+    elif button_text == "Waitlisted":
+        print(f"\nℹ️ Skip: You are already on the waitlist for this {workout_type}. ⏳")
+
+    # Condition C: Class is Full -> Join Waitlist
+    elif button_text == "Join Waitlist":
+        booking_btn.click()
+        print(f"\n⚠️ Full: {workout_type} was full, but you successfully joined the Waitlist! ⏳🤗")
+
+    # Condition D: Open to Book
+    elif button_text == "Book Class":
+        booking_btn.click()
+        print(f"\n✓ Booked: Fresh spot secured for {workout_type} on Tue at 6:00 PM! 📅 🤗")
+
+    # Fallback default condition
+    else:
+        print(f"\n❓ Unknown button state ('{button_text}'). Clicking anyway...")
+        booking_btn.click()
 
 # Catch the error if Selenium searches for 10 seconds but the Tuesday 6pm class isn't loaded on the DOM
 except TimeoutException:
