@@ -75,66 +75,88 @@ except TimeoutException:
 
 print("\nReady for gym booking automation tasks!")
 
+
+booked_count = 0
+waitlisted_count = 0
+already_registered_count = 0
+target_days = ["sun", "thu"]
 # Smart gym booking automatiion
-try:
-    # Line 1: Let yourself know in the terminal that the script has moved onto Step 3
-    print("\nScanning schedule for upcoming Tuesday at 6:00 PM...")
+
+for day in target_days:
+    day_name_capitalized = day.capitalize()
+    try:
+        # Line 1: Let yourself know in the terminal that the script has moved onto Step 3
+        print(f"\nScanning schedule for upcoming {day_name_capitalized} at 6:00 PM...")
 
 
-    # Line 2 (ULTRA-ROBUST): Finds the Tuesday header by its ID, looks forward for the next 6:00 PM card, and targets its button
-    target_xpath = "//h2[contains(@id, 'tue')]/following::div[contains(., '6:00 PM') or contains(., '6:00pm')][1]//button"
+        # Line 2 The string now dynamically plugs in '{day}' on each pass
+        target_xpath = f"//h2[contains(@id, '{day}')]/following::div[contains(., '6:00 PM') or contains(., '6:00pm')][1]//button"
 
-    #3 Wait until the target button is visible on the screen
-    booking_btn = wait.until(ec.visibility_of_element_located((By.XPATH, target_xpath)))
+        #3 Wait until the target button is visible on the screen
+        booking_btn = wait.until(ec.visibility_of_element_located((By.XPATH, target_xpath)))
 
-    #4 Capture the clean text on the button to check its status
-    button_text = booking_btn.text.strip()
-    print(f"Current button state detected: '{button_text}'")
+        #4 Capture the clean text on the button to check its status
+        button_text = booking_btn.text.strip()
+        print(f"Current button state detected: '{button_text}'")
 
-    # Line 4 (ULTRA-ROBUST): Looks forward from the Tuesday header to get the text of that exact 6:00 PM class wrapper block
-    card_element = booking_btn.find_element(By.XPATH, "./ancestor::div[1]")
-    card_text = card_element.text
+        # Line 4 (ULTRA-ROBUST): Looks forward from the Sunday header to get the text of that exact 6:00 PM class wrapper block
+        card_element = booking_btn.find_element(By.XPATH, "./ancestor::div[1]")
+        card_text = card_element.text
 
-    #5 Identify workout type
-    workout_type = "Class"
-    if "Spin" in card_text:
-        workout_type = "Spin Class"
-    elif "Yoga" in card_text:
-        workout_type = "Yoga Class"
-    elif "HIIT" in card_text:
-        workout_type = "HIIT Class"
+        #5 Identify workout type
+        workout_type = "Class"
+        if "Spin" in card_text:
+            workout_type = "Spin Class"
+        elif "Yoga" in card_text:
+            workout_type = "Yoga Class"
+        elif "HIIT" in card_text:
+            workout_type = "HIIT Class"
 
 
-    #-----SMART DECISION ENGINE--------
+        #-----SMART DECISION ENGINE--------
 
-    # Condition A: Already Booked
-    if button_text == "Booked":
-        print(f"\nℹ️ Skip: You have already booked this {workout_type}! No action taken. 😎")
+        # Condition A: Already Booked
+        if button_text == "Booked":
+            already_registered_count += 1
+            print(f"\nℹ️ Skip: You have already booked this {workout_type} on {day_name_capitalized} 😎")
 
-    # Condition B: Already on Waitlist
-    elif button_text == "Waitlisted":
-        print(f"\nℹ️ Skip: You are already on the waitlist for this {workout_type}. ⏳")
+        # Condition B: Already on Waitlist
+        elif button_text == "Waitlisted":
+            already_registered_count += 1
+            print(f"\nℹ️ Skip: You are already on the waitlist for this {workout_type} on {day_name_capitalized} ⏳")
 
-    # Condition C: Class is Full -> Join Waitlist
-    elif button_text == "Join Waitlist":
-        booking_btn.click()
-        print(f"\n⚠️ Full: {workout_type} was full, but you successfully joined the Waitlist! ⏳🤗")
+        # Condition C: Class is Full -> Join Waitlist
+        elif button_text == "Join Waitlist":
+            booking_btn.click()
+            waitlisted_count += 1
+            print(f"\n⚠️ Full: {workout_type} was full, but you successfully joined the Waitlist! ⏳🤗")
 
-    # Condition D: Open to Book
-    elif button_text == "Book Class":
-        booking_btn.click()
-        print(f"\n✓ Booked: Fresh spot secured for {workout_type} on Tue at 6:00 PM! 📅 🤗")
+        # Condition D: Open to Book
+        elif button_text == "Book Class":
+            booking_btn.click()
+            booked_count +=1
+            print(f"\n✓ Booked: Fresh spot secured for {workout_type} on {day_name_capitalized} at 6:00 PM! 📅 🤗")
 
-    # Fallback default condition
-    else:
-        print(f"\n❓ Unknown button state ('{button_text}'). Clicking anyway...")
-        booking_btn.click()
+        # Fallback default condition
+        else:
+            print(f"\n❓ Unknown button state ('{button_text}'). Clicking anyway...")
+            booking_btn.click()
 
-# Catch the error if Selenium searches for 10 seconds but the Tuesday 6pm class isn't loaded on the DOM
-except TimeoutException:
-    print("\n❌ Error: Could not locate an open Tuesday class at 6:00 PM on the schedule panel.")
+    # Catch the error if Selenium searches for 10 seconds but the Sunday 6pm class isn't loaded on the DOM
+    except TimeoutException:
+        print(f"\n❌ Error: Could not locate an open {day_name_capitalized} class at 6:00 PM on the schedule panel.")
 
-# Catch any other random runtime exception safely without crashing your terminal window
-except Exception as error_message:
-    print(f"\n❌ Automation runtime error while booking: {error_message}")
+    # Catch any other random runtime exception safely without crashing your terminal window
+    except Exception as error_message:
+        print(f"\n❌ Automation runtime error while booking: {error_message}")
 
+# ==========================================
+# ADDED: STEP 5 - PRINT BOOKING SUMMARY PANEL
+# ==========================================
+print("\n--- BOOKING SUMMARY ---")
+print(f"Classes booked: {booked_count}")
+print(f"Waitlists joined: {waitlisted_count}")
+print(f"Already booked/waitlisted: {already_registered_count}")
+
+total_processed = booked_count + waitlisted_count + already_registered_count
+print(f"Total targeted 6pm classes processed: {total_processed}\n")
